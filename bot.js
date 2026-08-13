@@ -6,7 +6,7 @@ app.get('/', (req, res) => {
   res.send('Bot is active!');
 });
 
-const PORT = process.env.PORT || process.env.PORT;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Keep-alive server is running on port ${PORT}`);
 });
@@ -67,7 +67,7 @@ async function main() {
         const msg = event.message.message;
 
         console.log("Sender ID:", sender.toString());
-        const USER_IDS = process.env.USER_IDS.split(",");
+        const USER_IDS = (process.env.USER_IDS || "").split(",")
 
         if (!USER_IDS.includes(sender.toString())) return;
         
@@ -136,13 +136,17 @@ async function main() {
         if (!msg.includes("t.me")) return;
         const currentToken = Date.now().toString();
         runningUsers[userId] = currentToken;
+
         console.log("START:", userId);
         console.log("RUNNING USERS:", runningUsers);
 
         try {
             const match = msg.match(/t\.me\/([\w\d_]+)\/(\d+)/);
-            if (!match) return;
-
+            if (!match) {
+                delete runningUsers[userId];
+                return;
+            }
+    
             const channel = match[1];
             const messageId = parseInt(match[2]);
 
@@ -157,7 +161,7 @@ async function main() {
             };
 
             const channelEntity = await client.getEntity(channel);
-            const currentToken = runningUsers[userId];
+
             while (runningUsers[userId] === currentToken) {
                 const jakartaHour = getJakartaHour()
                 
@@ -175,10 +179,14 @@ async function main() {
                     }
                     const groupEntity = await client.getEntity(grp);
                     if (runningUsers[userId] !== currentToken) break;
+                    
+                    console.log("MAU FORWARD KE:", grp);
                     await client.forwardMessages(groupEntity, {
                         messages: [messageId],
                         fromPeer: channelEntity
                     });
+                    console.log("BERHASIL FORWARD KE:", grp);
+
                     if (runningUsers[userId] !== currentToken) break;
                     await delay(25000);
                 }
