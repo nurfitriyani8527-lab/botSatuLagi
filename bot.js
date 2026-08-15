@@ -37,7 +37,7 @@ const client = new TelegramClient(
 
 const groups = [
     "adoptmeindooooo",
-    // "adoptmeindosuper",
+    "adoptmeindosuper",
     "lpmAdoptmeindon"
 ];
 
