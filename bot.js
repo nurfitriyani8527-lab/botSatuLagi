@@ -35,11 +35,12 @@ const client = new TelegramClient(
     { connectionRetries: 5 }
 );
 
-const groups = [
+const defaultGroups = [
     "adoptmeindooooo",
     "adoptmeindosuper",
     "lpmAdoptmeindon"
 ];
+let activeGroups = [...defaultGroups];
 
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 const runningUsers = {};
@@ -78,7 +79,7 @@ async function main() {
 
         if (msg === "/status") {
             const status = userStatus[userId];
-            const targetList = groups.map(g => `• ${g}`).join("\n");
+            const targetList = activeGroups.map(g => `• ${g}`).join("\n");
             if (!runningUsers[userId]) {
                 await event.message.reply({
                     message: `Bot off
@@ -110,6 +111,50 @@ async function main() {
             await event.message.reply({
                 message: `Delay diubah menjadi ${menit} menit`
             });
+            return;
+        }
+
+        if (msg === "/groups") {
+            const targetList = activeGroups.map(g => `• ${g}`).join("\n");
+            await event.message.reply({ message: `Daftar grup tujuan saat ini:\n${targetList}` });
+            return;
+        }
+
+        if (msg.startsWith("/group ")) {
+            if (userId !== process.env.OWNER_ID) {
+                console.log("Bukan owner, akses ditolak untuk edit grup");
+                await event.message.reply({ message: "Hanya owner yang dapat mengubah daftar grup." });
+                return;
+            }
+
+            const args = msg.split(" ").slice(1);
+            const command = args[0];
+
+            if (command === "add" && args[1]) {
+                const newGroup = args[1].replace("@", "");
+                if (!activeGroups.includes(newGroup)) {
+                    activeGroups.push(newGroup);
+                    await event.message.reply({ message: `Grup @${newGroup} berhasil ditambahkan.` });
+                } else {
+                    await event.message.reply({ message: `Grup @${newGroup} sudah ada di daftar.` });
+                }
+            } 
+            else if (command === "remove" && args[1]) {
+                const targetGroup = args[1].replace("@", "");
+                activeGroups = activeGroups.filter(g => g !== targetGroup);
+                await event.message.reply({ message: `Grup @${targetGroup} berhasil dihapus.` });
+            }
+            else if (command === "set" && args.length > 1) {
+                activeGroups = args.slice(1).map(g => g.replace("@", ""));
+                await event.message.reply({ message: `Daftar grup berhasil diubah menjadi:\n${activeGroups.map(g => `• @${g}`).join("\n")}` });
+            }
+            else if (command === "reset") {
+                activeGroups = [...defaultGroups];
+                await event.message.reply({ message: `Daftar grup dikembalikan ke default.` });
+            }
+            else {
+                await event.message.reply({ message: "Format salah. Gunakan:\n/group add @grup\n/group remove @grup\n/group set @grup1 @grup2\n/group reset" });
+            }
             return;
         }
 
@@ -173,7 +218,7 @@ async function main() {
                     });
                     break;
                 }
-                for (const grp of groups) {
+                for (const grp of activeGroups) {
                     if (runningUsers[userId] !== currentToken) {
                         console.log("STOP saat proses forward");
                         break;
