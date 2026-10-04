@@ -51,6 +51,7 @@ async function main() {
     //     phoneNumber: async () => await input.text("Nomor: "),
     //     password: async () => await input.text("Password: "),
     //     phoneCode: async () => await input.text("OTP: "),
+    //     onError: (err) => console.log(err),
     // });
     // console.log(client.session.save());
     console.log("Session exists:", fs.existsSync("session.txt"));
