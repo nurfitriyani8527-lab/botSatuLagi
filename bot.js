@@ -47,8 +47,8 @@ const client = new TelegramClient(
 );
 
 const DEFAULT_GROUPS = [
-    "adoptmeindooooo",
-    "adoptmeindosuper"
+    "lpmjualaccroblox",
+    "lpmrobloxpalace"
 ];
 let groups = [...DEFAULT_GROUPS];
 
