@@ -1,6 +1,14 @@
-require("dotenv").config();
+require("dotenv").config(); // Load environment variables
 const express = require('express');
 const app = express();
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 app.get('/', (req, res) => {
   res.send('Bot is active!');
@@ -32,15 +40,17 @@ const client = new TelegramClient(
     new StringSession(sessionData),
     apiId,
     apiHash,
-    { connectionRetries: 5 }
+    { 
+        connectionRetries: 5,
+        useWSS: true
+    }
 );
 
-const defaultGroups = [
-    "adoptmeindooooo",
-    "adoptmeindosuper",
-    "lpmAdoptmeindon"
+const DEFAULT_GROUPS = [
+    "lpmjualaccroblox",
+    "lpmrobloxpalace"
 ];
-let activeGroups = [...defaultGroups];
+let groups = [...DEFAULT_GROUPS];
 
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 const runningUsers = {};
@@ -79,9 +89,9 @@ async function main() {
 
         if (msg === "/status") {
             const status = userStatus[userId];
-            const targetList = activeGroups.map(g => `• ${g}`).join("\n");
+            const targetList = groups.map(g => `• ${g}`).join("\n");
             if (!runningUsers[userId]) {
-                await event.message.reply({
+                await client.sendMessage(userId, {
                     message: `Bot off
                     ⏱  Delay: ${delayLoop / 60000} menit
                     🔗 Source: ${status?.source || "-"}
@@ -90,7 +100,7 @@ async function main() {
                 })
                 return;
             }
-            await event.message.reply({
+            await client.sendMessage(userId, {
         message: `Bot on
         ⏱  Delay: ${delayLoop / 60000} menit
         🔗 Source: ${status?.source || "-"}
@@ -108,53 +118,9 @@ async function main() {
             const menit = parseInt(msg.split(" ")[1]);
             if (isNaN(menit)) return;
             delayLoop = menit * 60000;
-            await event.message.reply({
+            await client.sendMessage(userId, {
                 message: `Delay diubah menjadi ${menit} menit`
             });
-            return;
-        }
-
-        if (msg === "/groups") {
-            const targetList = activeGroups.map(g => `• ${g}`).join("\n");
-            await event.message.reply({ message: `Daftar grup tujuan saat ini:\n${targetList}` });
-            return;
-        }
-
-        if (msg.startsWith("/group ")) {
-            if (userId !== process.env.OWNER_ID) {
-                console.log("Bukan owner, akses ditolak untuk edit grup");
-                await event.message.reply({ message: "Hanya owner yang dapat mengubah daftar grup." });
-                return;
-            }
-
-            const args = msg.split(" ").slice(1);
-            const command = args[0];
-
-            if (command === "add" && args[1]) {
-                const newGroup = args[1].replace("@", "");
-                if (!activeGroups.includes(newGroup)) {
-                    activeGroups.push(newGroup);
-                    await event.message.reply({ message: `Grup @${newGroup} berhasil ditambahkan.` });
-                } else {
-                    await event.message.reply({ message: `Grup @${newGroup} sudah ada di daftar.` });
-                }
-            } 
-            else if (command === "remove" && args[1]) {
-                const targetGroup = args[1].replace("@", "");
-                activeGroups = activeGroups.filter(g => g !== targetGroup);
-                await event.message.reply({ message: `Grup @${targetGroup} berhasil dihapus.` });
-            }
-            else if (command === "set" && args.length > 1) {
-                activeGroups = args.slice(1).map(g => g.replace("@", ""));
-                await event.message.reply({ message: `Daftar grup berhasil diubah menjadi:\n${activeGroups.map(g => `• @${g}`).join("\n")}` });
-            }
-            else if (command === "reset") {
-                activeGroups = [...defaultGroups];
-                await event.message.reply({ message: `Daftar grup dikembalikan ke default.` });
-            }
-            else {
-                await event.message.reply({ message: "Format salah. Gunakan:\n/group add @grup\n/group remove @grup\n/group set @grup1 @grup2\n/group reset" });
-            }
             return;
         }
 
@@ -165,10 +131,55 @@ async function main() {
             return;
         }
 
+        if (msg === "/groups") {
+            const groupList = groups.length > 0 ? groups.map(g => `• @${g}`).join("\n") : "Tidak ada grup target.";
+            await client.sendMessage(userId, {
+                message: `Daftar Grup Target Saat Ini:\n${groupList}`
+            });
+            return;
+        }
+
+        if (msg.startsWith("/group ")) {
+            const args = msg.split(" ");
+            const command = args[1];
+            
+            if (command === "add" && args[2]) {
+                const newGroup = args[2].replace("@", "");
+                if (!groups.includes(newGroup)) {
+                    groups.push(newGroup);
+                    await client.sendMessage(userId, { message: `✅ Grup @${newGroup} berhasil ditambahkan.` });
+                } else {
+                    await client.sendMessage(userId, { message: `⚠️ Grup @${newGroup} sudah ada di daftar.` });
+                }
+            } else if (command === "remove" && args[2]) {
+                const targetGroup = args[2].replace("@", "");
+                const index = groups.indexOf(targetGroup);
+                if (index !== -1) {
+                    groups.splice(index, 1);
+                    await client.sendMessage(userId, { message: `✅ Grup @${targetGroup} berhasil dihapus.` });
+                } else {
+                    await client.sendMessage(userId, { message: `⚠️ Grup @${targetGroup} tidak ditemukan.` });
+                }
+            } else if (command === "set" && args.length > 2) {
+                const newGroups = args.slice(2).map(g => g.replace("@", ""));
+                groups = newGroups;
+                await client.sendMessage(userId, { message: `✅ Daftar grup berhasil diperbarui:\n${groups.map(g => `• @${g}`).join("\n")}` });
+            } else if (command === "reset") {
+                groups = [...DEFAULT_GROUPS];
+                await client.sendMessage(userId, { message: `✅ Daftar grup dikembalikan ke default:\n${groups.map(g => `• @${g}`).join("\n")}` });
+            } else {
+                await client.sendMessage(userId, { message: "❌ Perintah tidak valid.\n\nGunakan:\n- /group add @nama\n- /group remove @nama\n- /group set @grup1 @grup2\n- /group reset" });
+            }
+            return;
+        }
+
+        const match = msg.match(/t\.me\/([\w\d_]+)\/(\d+)/);
+        if (!match) return;
+
         const jakartaHour = getJakartaHour()  
         
         if (jakartaHour >= 0 && jakartaHour < 7) {
-            await event.message.reply({
+            await client.sendMessage(userId, {
                 message: "Bot sedang offline otomatis (00:00 - 07:00 WIB). Silakan kirim link lagi setelah jam 07:00."
             });
             return;
@@ -178,8 +189,6 @@ async function main() {
             console.log("Loop sudah berjalan untuk:", userId);
             return;
         }
-
-        if (!msg.includes("t.me")) return;
         const currentToken = Date.now().toString();
         runningUsers[userId] = currentToken;
 
@@ -187,12 +196,6 @@ async function main() {
         console.log("RUNNING USERS:", runningUsers);
 
         try {
-            const match = msg.match(/t\.me\/([\w\d_]+)\/(\d+)/);
-            if (!match) {
-                delete runningUsers[userId];
-                return;
-            }
-    
             const channel = match[1];
             const messageId = parseInt(match[2]);
 
@@ -208,30 +211,64 @@ async function main() {
 
             const channelEntity = await client.getEntity(channel);
 
+            const notifiedErrors = new Set(); // Track error agar tidak spam notif ke user setiap loop
+
             while (runningUsers[userId] === currentToken) {
                 const jakartaHour = getJakartaHour()
                 
                 if (jakartaHour >= 0 && jakartaHour < 7) {
                     delete runningUsers[userId];
-                    await event.message.reply({
+                    await client.sendMessage(userId, {
                         message: "Bot berhenti otomatis karena sudah masuk jam offline (00:00 - 07:00 WIB)."
                     });
                     break;
                 }
-                for (const grp of activeGroups) {
+                for (const grp of groups) {
                     if (runningUsers[userId] !== currentToken) {
                         console.log("STOP saat proses forward");
                         break;
                     }
-                    const groupEntity = await client.getEntity(grp);
-                    if (runningUsers[userId] !== currentToken) break;
                     
-                    console.log("MAU FORWARD KE:", grp);
-                    await client.forwardMessages(groupEntity, {
-                        messages: [messageId],
-                        fromPeer: channelEntity
-                    });
-                    console.log("BERHASIL FORWARD KE:", grp);
+                    try {
+                        const groupEntity = await client.getEntity(grp);
+                        if (runningUsers[userId] !== currentToken) break;
+                        
+                        console.log("MAU FORWARD KE:", grp);
+                        await client.forwardMessages(groupEntity, {
+                            messages: [messageId],
+                            fromPeer: channelEntity
+                        });
+                        console.log("BERHASIL FORWARD KE:", grp);
+                        notifiedErrors.delete(grp); // Hapus dari daftar error jika sudah berhasil
+                    } catch (forwardErr) {
+                        console.log(`GAGAL FORWARD KE: ${grp} | Error: ${forwardErr.message}`);
+                        
+                        if (!notifiedErrors.has(grp)) {
+                            let errMsg = forwardErr.message || "";
+                            let userFriendlyMessage = `⚠️ Gagal forward ke grup @${grp}.\n`;
+
+                            if (errMsg.includes("CHAT_WRITE_FORBIDDEN") || errMsg.includes("write in this chat")) {
+                                userFriendlyMessage += "❌ Akun ini tidak memiliki akses untuk mengirim pesan di grup tersebut (mungkin kena mute atau ban).";
+                            } else if (errMsg.includes("Could not find the input entity") || errMsg.includes("USERNAME_NOT_OCCUPIED") || errMsg.includes("Nobody is using this username")) {
+                                userFriendlyMessage += "🔍 Grup tidak ditemukan. Pastikan username grup benar dan akun ini sudah bergabung di grup tersebut.";
+                            } else if (errMsg.includes("CHANNEL_PRIVATE") || errMsg.includes("ChannelPrivateError") || errMsg.includes("banned from")) {
+                                userFriendlyMessage += "🚫 Grup bersifat privat atau akun ini telah dikeluarkan/diban dari grup.";
+                            } else if (errMsg.includes("SLOWMODE_WAIT")) {
+                                userFriendlyMessage += `⏳ Grup mengaktifkan slow mode.`;
+                            } else {
+                                userFriendlyMessage += `❗️ Error: ${errMsg}`;
+                            }
+
+                            // Kirim notifikasi ke user
+                            try {
+                                await client.sendMessage(userId, { message: userFriendlyMessage });
+                                notifiedErrors.add(grp); // Tandai agar tidak dikirim berulang-ulang setiap loop
+                            } catch (notifyErr) {
+                                console.log("Gagal mengirim notif error ke user:", notifyErr.message);
+                            }
+                        }
+                        // Skip ke grup berikutnya tanpa menghentikan bot
+                    }
 
                     if (runningUsers[userId] !== currentToken) break;
                     await delay(25000);
@@ -250,7 +287,7 @@ async function main() {
                     if (jakartaHour >= 0 && jakartaHour < 7) {
                         delete runningUsers[userId];
                         console.log("STOP OTOMATIS JAM 00");
-                        await event.message.reply({
+                        await client.sendMessage(userId, {
                             message: "Bot berhenti otomatis karena sudah jam 12 malam dan akan kembali share di jam 7 pagi!"
                         });
                         break;
@@ -260,6 +297,13 @@ async function main() {
             } catch (err) {
                 console.log("ERROR USER:", userId);
                 console.log(err);
+                
+                try {
+                    await client.sendMessage(userId, { message: `❗️ Terjadi kesalahan sistem saat memproses perintah:\n${err.message}\n\nProses share dihentikan.` });
+                } catch (notifyErr) {
+                    console.log("Gagal kirim pesan error outer:", notifyErr.message);
+                }
+
                 delete runningUsers[userId];
             }
 
