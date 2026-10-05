@@ -82,6 +82,10 @@ async function main() {
         const USER_IDS = (process.env.USER_IDS || "").split(",")
 
         if (!USER_IDS.includes(sender.toString())) return;
+        
+        // HANYA proses pesan dari chat pribadi (Private Chat / Saved Messages)
+        // Ini mencegah bot ter-trigger oleh pesan yang dia forward sendiri ke grup
+        if (!event.isPrivate) return;
 
         console.log("Masuk:", msg);
 
