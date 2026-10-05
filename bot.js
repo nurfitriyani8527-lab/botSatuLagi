@@ -11,12 +11,12 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Bot is active!');
+    res.send('Bot is active!');
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Keep-alive server is running on port ${PORT}`);
+    console.log(`Keep-alive server is running on port ${PORT}`);
 });
 
 const { TelegramClient } = require("telegram");
@@ -24,7 +24,7 @@ const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
 const input = require("input");
 const fs = require("fs");
-const {getJakartaHour} = require("./utils/jakartaHour")
+const { getJakartaHour } = require("./utils/jakartaHour")
 
 const apiId = Number(process.env.API_ID);
 const apiHash = process.env.API_HASH;
@@ -40,7 +40,7 @@ const client = new TelegramClient(
     new StringSession(sessionData),
     apiId,
     apiHash,
-    { 
+    {
         connectionRetries: 5,
         useWSS: true
     }
@@ -82,7 +82,7 @@ async function main() {
         const USER_IDS = (process.env.USER_IDS || "").split(",")
 
         if (!USER_IDS.includes(sender.toString())) return;
-        
+
         console.log("Masuk:", msg);
 
         const userId = sender.toString();
@@ -101,12 +101,12 @@ async function main() {
                 return;
             }
             await event.message.reply({
-        message: `Bot on
+                message: `Bot on
         ⏱  Delay: ${delayLoop / 60000} menit
         🔗 Source: ${status?.source || "-"}
         👥 Target: ${targetList}
         👤 Running : ${Object.keys(runningUsers).length} user`
-        });
+            });
             return;
         }
 
@@ -124,9 +124,32 @@ async function main() {
             return;
         }
 
-        if (msg === "/stop") {
+        if (msg.trim().toLowerCase() === "/stop") {
             console.log("STOP DARI:", userId);
-            delete runningUsers[userId];
+            
+            const runningList = Object.keys(runningUsers);
+            
+            if (runningList.length === 0) {
+                await event.message.reply({ message: "⚠️ Bot tidak sedang berjalan." });
+                return;
+            }
+
+            for (const rUser of runningList) {
+                delete runningUsers[rUser];
+                
+                // Beri tahu user yang sedang menjalankan bot (jika berbeda dengan yang ngetik /stop)
+                if (rUser !== userId) {
+                    try {
+                        await client.sendMessage(rUser, { message: `🛑 Proses bot-mu telah dihentikan oleh admin/user lain.` });
+                    } catch (err) {
+                        console.log("Gagal mengirim notif stop ke:", rUser);
+                    }
+                }
+            }
+
+            // Balas ke user yang ngetik /stop
+            await event.message.reply({ message: "✅ Semua proses bot berhasil dihentikan." });
+            
             console.log("RUNNING USERS:", runningUsers);
             return;
         }
@@ -142,7 +165,7 @@ async function main() {
         if (msg.startsWith("/group ")) {
             const args = msg.split(" ");
             const command = args[1];
-            
+
             if (command === "add" && args[2]) {
                 const newGroup = args[2].replace("@", "");
                 if (!groups.includes(newGroup)) {
@@ -176,8 +199,8 @@ async function main() {
         const match = msg.match(/t\.me\/([\w\d_]+)\/(\d+)/);
         if (!match) return;
 
-        const jakartaHour = getJakartaHour()  
-        
+        const jakartaHour = getJakartaHour()
+
         if (jakartaHour >= 0 && jakartaHour < 7) {
             await event.message.reply({
                 message: "Bot sedang offline otomatis (00:00 - 07:00 WIB). Silakan kirim link lagi setelah jam 07:00."
@@ -215,7 +238,7 @@ async function main() {
 
             while (runningUsers[userId] === currentToken) {
                 const jakartaHour = getJakartaHour()
-                
+
                 if (jakartaHour >= 0 && jakartaHour < 7) {
                     delete runningUsers[userId];
                     await event.message.reply({
@@ -228,11 +251,11 @@ async function main() {
                         console.log("STOP saat proses forward");
                         break;
                     }
-                    
+
                     try {
                         const groupEntity = await client.getEntity(grp);
                         if (runningUsers[userId] !== currentToken) break;
-                        
+
                         console.log("MAU FORWARD KE:", grp);
                         await client.forwardMessages(groupEntity, {
                             messages: [messageId],
@@ -242,7 +265,7 @@ async function main() {
                         notifiedErrors.delete(grp); // Hapus dari daftar error jika sudah berhasil
                     } catch (forwardErr) {
                         console.log(`GAGAL FORWARD KE: ${grp} | Error: ${forwardErr.message}`);
-                        
+
                         if (!notifiedErrors.has(grp)) {
                             let errMsg = forwardErr.message || "";
                             let userFriendlyMessage = `⚠️ Gagal forward ke grup @${grp}.\n`;
@@ -294,20 +317,20 @@ async function main() {
                         });
                         break;
                     }
-                    }
-            }
-            } catch (err) {
-                console.log("ERROR USER:", userId);
-                console.log(err);
-                
-                try {
-                    await event.message.reply({ message: `❗️ Terjadi kesalahan sistem saat memproses perintah:\n${err.message}\n\nProses share dihentikan.` });
-                } catch (notifyErr) {
-                    console.log("Gagal kirim pesan error outer:", notifyErr.message);
                 }
-
-                delete runningUsers[userId];
             }
+        } catch (err) {
+            console.log("ERROR USER:", userId);
+            console.log(err);
+
+            try {
+                await event.message.reply({ message: `❗️ Terjadi kesalahan sistem saat memproses perintah:\n${err.message}\n\nProses share dihentikan.` });
+            } catch (notifyErr) {
+                console.log("Gagal kirim pesan error outer:", notifyErr.message);
+            }
+
+            delete runningUsers[userId];
+        }
 
     }, new NewMessage({ incoming: true, outgoing: true }));
 
